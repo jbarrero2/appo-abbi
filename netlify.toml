@@ -1,0 +1,18 @@
+# ===================================================================
+# Ap-Ab — configuración de Netlify
+# Publica el sitio estático y expone la función serverless del cotizador.
+# ===================================================================
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  # Incluye la rúbrica en el bundle de la función (la lee cotizar.js).
+  included_files = ["config.json"]
+
+# La página del cotizador no debe indexarse en buscadores.
+[[headers]]
+  for = "/cotizador.html"
+  [headers.values]
+    X-Robots-Tag = "noindex"

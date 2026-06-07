@@ -1,0 +1,14 @@
+# Secretos — nunca commitear
+.env
+.env.*
+!.env.example
+
+# Dependencias / build
+node_modules/
+.netlify/
+
+# Sistema
+.DS_Store
+
+# Datos locales de prueba (backend_local.py)
+.local_data.json

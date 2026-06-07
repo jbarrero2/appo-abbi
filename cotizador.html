@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cotizador — Ap-Ab</title>
+<meta name="description" content="Cotiza tu proyecto de software con Ap-Ab. Precio transparente comparado con el mercado, en minutos." />
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  /* ===== cotizador (específico de esta página) ===== */
+  .app-main{padding:60px 0 100px;min-height:70vh}
+  .accountbar{display:flex;align-items:center;gap:14px;font-size:.86rem;color:var(--muted)}
+  .accountbar .em{color:var(--paper);font-weight:600}
+  .linkish{color:var(--muted);cursor:pointer;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase}
+  .linkish:hover{color:var(--ember)}
+
+  .notice{max-width:760px;margin:0 auto 24px;border:1px solid var(--line-strong);background:rgba(255,171,77,.06);border-radius:14px;padding:16px 18px;font-size:.9rem;color:var(--muted)}
+  .notice b{color:var(--paper)}
+
+  /* auth */
+  .auth-wrap{max-width:440px;margin:30px auto 0}
+  .auth-wrap .intro{text-align:center;margin-bottom:26px}
+  .auth-wrap h1{font-size:clamp(2rem,5vw,2.6rem);max-width:none}
+  .auth-wrap .intro p{color:var(--muted);margin-top:14px}
+  .tabs{display:flex;gap:6px;margin-bottom:22px;border:1px solid var(--line);border-radius:999px;padding:5px;background:var(--ink-2)}
+  .tab{flex:1;text-align:center;padding:11px;border-radius:999px;font-weight:600;font-size:.92rem;color:var(--muted);cursor:pointer;transition:background .2s,color .2s}
+  .tab.on{background:var(--ember);color:#180802}
+  .auth-trust{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+  .auth-trust .t{display:flex;gap:10px;align-items:center;font-size:.86rem;color:var(--muted)}
+  .auth-trust .t b{color:var(--paper);font-weight:600}
+  .auth-trust .ck{color:var(--ember);flex:none}
+
+  /* cotizador */
+  .cz-head{max-width:760px;margin:0 auto 30px}
+  .cz-head h1{font-size:clamp(2rem,5vw,2.8rem);max-width:none}
+  .cz-head p{color:var(--muted);margin-top:12px}
+  .cz{max-width:760px;margin:0 auto}
+  .group{margin-bottom:26px}
+  .group > .lbl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{border:1px solid var(--line-strong);border-radius:999px;padding:10px 17px;cursor:pointer;font-size:.92rem;color:var(--muted);transition:border-color .2s,background .2s,color .2s;user-select:none}
+  .chip:hover{border-color:var(--paper)}
+  .chip.on{border-color:var(--ember);background:rgba(255,91,46,.12);color:var(--paper)}
+  .switchrow{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--ink-2);cursor:pointer}
+  .switch{width:46px;height:26px;border-radius:999px;background:var(--line-strong);position:relative;flex:none;transition:background .2s}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--paper);transition:transform .2s}
+  .switchrow.on .switch{background:var(--ember)}
+  .switchrow.on .switch::after{transform:translateX(20px)}
+  .switchrow .tx .h{font-weight:600;color:var(--paper)}
+  .switchrow .tx .s{font-size:.84rem;color:var(--muted);margin-top:2px}
+  #ideaWrap{margin-top:16px}
+  .cz-actions{margin-top:30px}
+  .cz-actions .btn{font-size:1.02rem;padding:16px 30px}
+  .cz-actions .btn[disabled]{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+
+  /* resultado / comparador */
+  .result{margin-top:40px;display:none}
+  .result.show{display:block;animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+  .result .restitle{font-family:var(--mono);font-size:.7rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ember);margin-bottom:16px}
+  .tiers{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:600px){.tiers{grid-template-columns:1fr}}
+  .tier{border:1px solid var(--line);border-radius:16px;padding:24px;background:var(--ink-2)}
+  .tier .k{font-family:var(--mono);font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .tier .v{font-family:var(--display);font-weight:700;font-size:1.34rem;margin-top:8px;letter-spacing:-.01em}
+  .tier .sub{font-size:.8rem;color:var(--muted-2);margin-top:4px}
+  .tier.market .v{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(154,152,138,.5)}
+  .tier.launch{grid-column:1/-1;border:1px solid rgba(255,91,46,.45);background:linear-gradient(135deg,rgba(255,91,46,.1),rgba(233,196,106,.05));position:relative;overflow:hidden}
+  .tier.launch .k{color:var(--ember-2)}
+  .tier.launch .v{font-size:clamp(1.8rem,6vw,2.6rem);margin-top:10px;background:linear-gradient(100deg,var(--ember),var(--ember-2) 55%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .badge{display:inline-block;font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:#180802;background:linear-gradient(135deg,var(--ember),var(--ember-2));padding:5px 11px;border-radius:999px;margin-bottom:6px}
+  .savings{margin-top:18px;border:1px solid rgba(255,91,46,.3);background:rgba(255,91,46,.08);border-radius:14px;padding:18px 20px;font-size:1.05rem}
+  .savings b{font-family:var(--display);color:var(--paper);font-size:1.2rem}
+  .savings .pct{color:var(--ember-2);font-weight:700}
+  .pay{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:600px){.pay{grid-template-columns:1fr}}
+  .paycard{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--ink-2)}
+  .paycard .k{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ember)}
+  .paycard .amt{font-family:var(--display);font-weight:700;font-size:1.2rem;margin-top:6px}
+  .paycard .when{font-size:.84rem;color:var(--muted);margin-top:3px}
+  .notes{margin-top:18px;font-size:.82rem;color:var(--muted-2);line-height:1.7}
+  .notes .n{display:flex;gap:8px}
+  .result-cta{margin-top:24px;display:flex;gap:14px;flex-wrap:wrap}
+  .params-used{margin-top:16px;font-family:var(--mono);font-size:.68rem;color:var(--muted-2);letter-spacing:.04em}
+
+  .msgbox{display:none;border-radius:14px;padding:18px 20px;margin-top:22px;font-size:.95rem}
+  .msgbox.show{display:block}
+  .msgbox.err{background:rgba(255,255,255,.04);border:1px solid var(--line-strong);color:var(--muted)}
+  .msgbox.warn{background:rgba(255,171,77,.08);border:1px solid rgba(255,171,77,.35);color:var(--paper)}
+  .demo-banner{max-width:760px;margin:0 auto 22px;border:1px dashed rgba(255,91,46,.45);border-radius:14px;padding:14px 18px;font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;color:var(--ember-2);text-align:center}
+  .hidden{display:none !important}
+
+  /* paquete de compra (10 cotizaciones rápidas · US$5) */
+  .buy-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:22px;border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:linear-gradient(135deg,rgba(233,196,106,.07),rgba(255,91,46,.04))}
+  .buy-row .buy-h{font-weight:700;color:var(--paper)}
+  .buy-row .buy-s{font-size:.86rem;color:var(--muted);margin-top:3px}
+  .buy-row .buy-s b{color:var(--paper)}
+  .btn.buy{background:linear-gradient(135deg,var(--gold),var(--ember-2));border-color:var(--gold);color:#231405;white-space:nowrap}
+  .btn.buy:hover{box-shadow:0 12px 34px rgba(233,196,106,.32)}
+  .quota-info{margin-top:12px;font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;color:var(--muted-2)}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-aurora"></div>
+<div class="bg-noise"></div>
+<div class="cursor-glow" id="glow"></div>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <a href="index.html" class="brand"><span class="mk">A·A</span>Ap-Ab</a>
+      <div class="accountbar">
+        <a href="index.html" class="linkish">← Inicio</a>
+        <span id="acctEmail" class="em hidden"></span>
+        <span id="logoutBtn" class="linkish hidden">Salir</span>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="app-main">
+  <div class="wrap">
+
+    <!-- aviso de configuración (si faltan claves de Supabase) -->
+    <div id="configNotice" class="notice hidden"></div>
+
+    <!-- banner de vista de ejemplo (?demo=1) -->
+    <div id="demoBanner" class="demo-banner hidden">Vista de ejemplo — así se ve una cotización. Inicia sesión para generar la tuya.</div>
+
+    <!-- ===== AUTH ===== -->
+    <section id="authView" class="hidden" style="padding:0">
+      <div class="auth-wrap">
+        <div class="intro">
+          <h1>Tu cotización rápida</h1>
+          <p>Crea tu cuenta o entra para tu cotización rápida <b style="color:var(--paper)">gratis</b> — máximo 2 por semana, sin compromiso.</p>
+        </div>
+
+        <div class="tabs">
+          <div class="tab on" id="tabLogin">Entrar</div>
+          <div class="tab" id="tabSignup">Crear cuenta</div>
+        </div>
+
+        <form id="authForm" onsubmit="return false">
+          <div class="field">
+            <label for="email">Correo electrónico</label>
+            <input type="email" id="email" name="email" required placeholder="tucorreo@ejemplo.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="password">Contraseña</label>
+            <input type="password" id="password" name="password" required placeholder="Mínimo 6 caracteres" autocomplete="current-password" minlength="6" />
+          </div>
+          <button type="submit" class="btn" id="authSubmit">Entrar →</button>
+          <div class="formnote" id="authNote">Cotización rápida gratis · máximo 2 por semana · el 80% lo pagas solo al entregar</div>
+          <div class="formmsg" id="authMsg"></div>
+        </form>
+
+        <div class="auth-trust">
+          <div class="t"><span class="ck">✓</span><span>Cotización rápida <b>gratis</b> — máximo 2 por semana.</span></div>
+          <div class="t"><span class="ck">✓</span><span>Precio comparado con el <b>mercado</b>, sin letra pequeña.</span></div>
+          <div class="t"><span class="ck">✓</span><span>Empiezas con el <b>20%</b>; el 80% al entregar.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== COTIZADOR ===== -->
+    <section id="appView" class="hidden" style="padding:0">
+      <div class="cz-head">
+        <span class="mono">Cotización rápida · Gratis</span>
+        <h1>Cuéntanos tu proyecto</h1>
+        <p>Elige las opciones que mejor lo describan y obtén tu precio al instante, comparado con el mercado. <b style="color:var(--paper)">Es gratis — máximo 2 por semana.</b></p>
+      </div>
+
+      <div class="cz">
+        <!-- describe tu idea (texto libre) -->
+        <div class="group">
+          <span class="lbl">Describe tu proyecto</span>
+          <textarea id="idea" class="field" style="width:100%;background:var(--ink);border:1px solid var(--line-strong);border-radius:11px;padding:14px 16px;color:var(--paper);font-family:var(--body);font-size:1rem;min-height:96px;resize:vertical" placeholder="Ej: una app para que mi restaurante reciba pedidos a domicilio, con pagos y login de clientes..."></textarea>
+        </div>
+
+        <!-- toggle modo IA -->
+        <div class="group" id="aiWrap">
+          <div class="switchrow" id="aiToggle">
+            <div class="switch"></div>
+            <div class="tx">
+              <div class="h">Autocompletar con IA</div>
+              <div class="s">Usa tu descripción para sugerir las opciones automáticamente.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- tipo -->
+        <div class="group">
+          <span class="lbl">Tipo de proyecto</span>
+          <div class="chips" data-group="tipo" data-single="1">
+            <div class="chip" data-value="landing">Landing / sitio simple</div>
+            <div class="chip on" data-value="web_o_app_sencilla">Web o app sencilla</div>
+            <div class="chip" data-value="app_con_backend">App con backend</div>
+            <div class="chip" data-value="app_compleja">App compleja</div>
+            <div class="chip" data-value="producto_con_ia">Producto con IA</div>
+          </div>
+        </div>
+
+        <!-- plataformas -->
+        <div class="group">
+          <span class="lbl">Plataformas</span>
+          <div class="chips" data-group="plataformas">
+            <div class="chip on" data-value="web">Web</div>
+            <div class="chip" data-value="ios">iOS</div>
+            <div class="chip" data-value="android">Android</div>
+            <div class="chip" data-value="escritorio">Escritorio</div>
+          </div>
+        </div>
+
+        <!-- complejidad -->
+        <div class="group">
+          <span class="lbl">Complejidad</span>
+          <div class="chips" data-group="complejidad" data-single="1">
+            <div class="chip" data-value="baja">Baja</div>
+            <div class="chip on" data-value="media">Media</div>
+            <div class="chip" data-value="alta">Alta</div>
+          </div>
+        </div>
+
+        <!-- add-ons -->
+        <div class="group">
+          <span class="lbl">Funcionalidades (add-ons)</span>
+          <div class="chips" data-group="addons">
+            <div class="chip" data-value="autenticacion">Autenticación / usuarios</div>
+            <div class="chip" data-value="pagos">Pagos</div>
+            <div class="chip" data-value="integraciones">Integraciones</div>
+            <div class="chip" data-value="ia_llm">IA / LLM</div>
+            <div class="chip" data-value="diseno_personalizado">Diseño personalizado</div>
+            <div class="chip" data-value="multiplataforma">Multiplataforma</div>
+          </div>
+        </div>
+
+        <!-- urgencia -->
+        <div class="group">
+          <span class="lbl">Tiempo</span>
+          <div class="chips" data-group="urgencia" data-single="1">
+            <div class="chip on" data-value="no">Tiempo normal</div>
+            <div class="chip" data-value="si">Con urgencia (+25%)</div>
+          </div>
+        </div>
+
+        <div class="cz-actions">
+          <button class="btn" id="cotizarBtn">Hacer cotización rápida →</button>
+          <div class="cta-note" style="margin-top:16px"><span class="dot"></span><b>Gratis · máximo 2 por semana</b> · El 80% lo pagas solo al entregar</div>
+
+          <div class="buy-row" id="buyRow">
+            <div class="buy-tx">
+              <div class="buy-h">¿Necesitas más de 2 por semana?</div>
+              <div class="buy-s">Compra un paquete de <b>10 cotizaciones rápidas</b> y úsalas cuando quieras.</div>
+            </div>
+            <a id="buyBtn" class="btn buy" target="_blank" rel="noopener">Comprar 10 · US$5</a>
+          </div>
+          <div class="quota-info" id="quotaInfo"></div>
+        </div>
+
+        <!-- mensajes (límite / error) -->
+        <div class="msgbox" id="msgBox"></div>
+
+        <!-- ===== RESULTADO / COMPARADOR ===== -->
+        <div class="result" id="result">
+          <div class="restitle">Tu cotización estimada</div>
+          <div class="tiers">
+            <div class="tier market">
+              <div class="k">Tarifa promedio del mercado</div>
+              <div class="v" id="rMarket">—</div>
+              <div class="sub">Referencia del sector</div>
+            </div>
+            <div class="tier">
+              <div class="k">Precio Ap-Ab</div>
+              <div class="v" id="rApab">—</div>
+              <div class="sub">50% del mercado</div>
+            </div>
+            <div class="tier launch">
+              <span class="badge" id="rBadge">Precio de lanzamiento</span>
+              <div class="k">Precio de lanzamiento</div>
+              <div class="v" id="rLaunch">—</div>
+              <div class="sub" id="rLaunchSub">25% del mercado</div>
+            </div>
+          </div>
+
+          <div class="savings">
+            Ahorras <b id="rSavings">—</b> <span class="pct" id="rSavingsPct"></span> frente al mercado.
+          </div>
+
+          <div class="pay">
+            <div class="paycard">
+              <div class="k">Anticipo · 20%</div>
+              <div class="amt" id="rDeposit">—</div>
+              <div class="when">Al iniciar el proyecto</div>
+            </div>
+            <div class="paycard">
+              <div class="k">Saldo · 80%</div>
+              <div class="amt" id="rBalance">—</div>
+              <div class="when">Solo al entregar</div>
+            </div>
+          </div>
+
+          <div class="notes">
+            <div class="n">› <span id="rNote1">Precio estimado, sujeto a revisión.</span></div>
+            <div class="n">› <span id="rNote2"></span></div>
+          </div>
+          <div class="params-used" id="rParams"></div>
+
+          <div class="result-cta">
+            <a href="https://wa.me/573185990793?text=Hola%20Ap-Ab%2C%20acabo%20de%20cotizar%20mi%20proyecto%20y%20quiero%20avanzar" target="_blank" rel="noopener" class="btn wa">Avanzar por WhatsApp →</a>
+            <a href="index.html#contacto" class="btn ghost">Escribirnos</a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- Supabase JS (CDN) + config pública + lógica -->
+<script src="assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/cotizador.js"></script>
+<script>
+  // glow (igual que en la landing)
+  const glow = document.getElementById('glow');
+  window.addEventListener('pointermove', e=>{
+    glow.style.left = e.clientX + 'px';
+    glow.style.top = e.clientY + 'px';
+  });
+</script>
+</body>
+</html>

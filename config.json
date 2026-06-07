@@ -1,0 +1,27 @@
+{
+  "moneda": "COP",
+  "nota_referencia": "Tarifa de mercado según fuentes del sector en Colombia, 2026",
+  "factor_apab": 0.5,
+  "descuento_lanzamiento": 0.5,
+  "vigencia_lanzamiento": "2026-06-21",
+  "anticipo": 0.2,
+  "saldo": 0.8,
+  "tarifa_mercado_por_tipo": {
+    "landing": 3000000,
+    "web_o_app_sencilla": 9000000,
+    "app_con_backend": 20000000,
+    "app_compleja": 42000000,
+    "producto_con_ia": 28000000
+  },
+  "factor_complejidad": { "baja": 1.0, "media": 1.4, "alta": 1.9 },
+  "addons_mercado": {
+    "autenticacion": 3000000,
+    "pagos": 5000000,
+    "integraciones": 4000000,
+    "ia_llm": 10000000,
+    "diseno_personalizado": 4000000,
+    "multiplataforma": 7000000
+  },
+  "urgencia_factor": 1.25,
+  "rango": { "min": 0.85, "max": 1.25 }
+}
