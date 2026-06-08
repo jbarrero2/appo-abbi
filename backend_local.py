@@ -78,6 +78,45 @@ def validate_supabase(sc, token):
         return None
 
 
+def esp_system(is_iterate):
+    base = (
+        "Eres Arquitecto de Software Senior y Disenador UI de Ap-Ab. Devuelve EXCLUSIVAMENTE un objeto JSON "
+        "valido (sin markdown, sin texto fuera del JSON) con las claves: "
+        "nombre_proyecto (string corto), "
+        "dra (Markdown siguiendo el contrato MASTER DRA, en este orden: '# MASTER DRA: [Nombre]', "
+        "'## 1. VISION ARQUITECTONICA', '## 2. REGLAS ESTRICTAS DE SISTEMA' [Frontend: HTML5/CSS3/Vanilla JS sin frameworks; "
+        "Backend: Python puro o FastAPI; UI/UX: glassmorphism estricto, colores oscuros, sin emojis], "
+        "'## 3. ESPECIFICACIONES DE FRONTEND (UI/UX)', '## 4. ESPECIFICACIONES DE BACKEND Y LOGICA', '## 5. ESTRUCTURA DE DATOS'), "
+        "mockup_html (un documento HTML completo y autocontenido, glassmorphism, fondo oscuro #0a0b08, acentos #ff5b2e y #ffab4d, "
+        "sin emojis, sin imagenes externas, sin frameworks ni CDNs, que muestre la pantalla principal del producto), "
+        "params (tipo in [landing, web_o_app_sencilla, app_con_backend, app_compleja, producto_con_ia], "
+        "complejidad in [baja, media, alta], addons subset de [autenticacion, pagos, integraciones, ia_llm, diseno_personalizado, multiplataforma], "
+        "urgencia bool, plataformas subset de [web, ios, android, escritorio]). "
+    )
+    return base + ("Refina el plan existente segun el cambio del usuario." if is_iterate else "Planea desde la descripcion del usuario.")
+
+
+def deepseek_call(messages):
+    key = os.environ.get("DEEPSEEK_API_KEY")
+    if not key:
+        return None
+    model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+    body = json.dumps({
+        "model": model, "messages": messages, "max_tokens": 8000,
+        "temperature": 0.4, "response_format": {"type": "json_object"},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.deepseek.com/chat/completions", data=body,
+        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=90) as r:
+        d = json.loads(r.read().decode("utf-8"))
+    text = (d.get("choices", [{}])[0].get("message", {}).get("content", "") or "").strip()
+    text = re.sub(r"^```(?:json)?", "", text)
+    text = re.sub(r"```$", "", text)
+    return json.loads(text.strip())
+
+
 # ---------- pricing (igual que netlify/functions/lib/pricing.js) ----------
 def r1000(n):
     return round(n / 1000) * 1000
@@ -152,7 +191,112 @@ class H(http.server.SimpleHTTPRequestHandler):
             return self.h_login(data)
         if path == "/.netlify/functions/cotizar":
             return self.h_cotizar(data)
+        if path == "/.netlify/functions/cotizar-especifica":
+            return self.h_especifica(data)
+        if path == "/.netlify/functions/solicitud-final":
+            return self.h_solicitud(data)
         return self._json(404, {"error": "not_found"})
+
+    # Resuelve el usuario por sesión local o por JWT de Supabase. -> (user_key, email)
+    def _resolve(self, d, token):
+        uk = d["sessions"].get(token or "")
+        if uk and uk in d["users"]:
+            return uk, uk  # en local la clave ES el correo
+        sc = supa_cfg()
+        if sc and token:
+            try:
+                req = urllib.request.Request(sc[0] + "/auth/v1/user",
+                                             headers={"apikey": sc[1], "Authorization": "Bearer " + token})
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    obj = json.loads(r.read().decode("utf-8"))
+                if obj.get("id"):
+                    return "supa:" + obj["id"], obj.get("email")
+            except Exception:
+                pass
+        return None, None
+
+    def h_especifica(self, data):
+        if not os.environ.get("DEEPSEEK_API_KEY"):
+            return self._json(503, {"error": "especifica_unavailable",
+                                    "detail": "Pon DEEPSEEK_API_KEY en el .env local para probar la especifica."})
+        d = load_data()
+        uk, email = self._resolve(d, data.get("token") or "")
+        if not uk:
+            return self._json(401, {"error": "invalid_session"})
+        try:
+            cfg = load_cfg()
+        except Exception:
+            return self._json(500, {"error": "config"})
+        action = "iterate" if data.get("action") == "iterate" else "start"
+        text = (data.get("text") or "").strip()[:4000]
+        if not text:
+            return self._json(400, {"error": "empty_text"})
+        sessions = d.setdefault("esp_sessions", {})
+
+        if action == "iterate":
+            sid = data.get("session_id")
+            s = sessions.get(sid)
+            if not s or s.get("user") != uk:
+                return self._json(404, {"error": "session_not_found"})
+            if s.get("iters", 0) >= 12:
+                return self._json(429, {"error": "max_iters"})
+            try:
+                out = deepseek_call([
+                    {"role": "system", "content": esp_system(True)},
+                    {"role": "user", "content": "PLAN ACTUAL (DRA):\n" + (s.get("dra") or "") +
+                        "\n\nPARAMS: " + json.dumps(s.get("params") or {}) +
+                        "\n\nCAMBIO SOLICITADO:\n" + text + "\n\nDevuelve el JSON COMPLETO actualizado."},
+                ])
+            except Exception:
+                return self._json(502, {"error": "ai_error"})
+            out["params"] = resolve_params(cfg, out.get("params"))
+            s["dra"] = out.get("dra"); s["params"] = out["params"]; s["nombre"] = out.get("nombre_proyecto")
+            s["iters"] = s.get("iters", 0) + 1
+            save_data(d)
+            q = compute_quote(cfg, out["params"], date.today().isoformat())
+            return self._json(200, {"ok": True, "mockup_html": out.get("mockup_html", ""), "quote": q,
+                                    "nombre_proyecto": out.get("nombre_proyecto", ""), "iter_count": s["iters"],
+                                    "iters_left": 12 - s["iters"]})
+
+        # start (en local no aplicamos el limite; es para probar)
+        try:
+            out = deepseek_call([
+                {"role": "system", "content": esp_system(False)},
+                {"role": "user", "content": "Descripcion del proyecto:\n" + text},
+            ])
+        except Exception:
+            return self._json(502, {"error": "ai_error"})
+        out["params"] = resolve_params(cfg, out.get("params"))
+        sid = secrets.token_hex(12)
+        sessions[sid] = {"user": uk, "email": email, "nombre": out.get("nombre_proyecto"),
+                         "dra": out.get("dra"), "params": out["params"], "iters": 0}
+        save_data(d)
+        q = compute_quote(cfg, out["params"], date.today().isoformat())
+        return self._json(200, {"ok": True, "session_id": sid, "mockup_html": out.get("mockup_html", ""),
+                                "nombre_proyecto": out.get("nombre_proyecto", ""), "quote": q,
+                                "source": "free", "remaining_free": FREE_PER_WEEK, "remaining_credits": 0, "iters_left": 12})
+
+    def h_solicitud(self, data):
+        d = load_data()
+        uk, email = self._resolve(d, data.get("token") or "")
+        if not uk:
+            return self._json(401, {"error": "invalid_session"})
+        sid = data.get("session_id")
+        s = (d.get("esp_sessions") or {}).get(sid)
+        if not s or s.get("user") != uk:
+            return self._json(404, {"error": "session_not_found"})
+        d.setdefault("solicitudes", []).append({
+            "user": uk, "email": email or s.get("email"), "nombre_proyecto": s.get("nombre"),
+            "dra": s.get("dra"), "params": s.get("params"),
+        })
+        save_data(d)
+        q = None
+        try:
+            q = compute_quote(load_cfg(), s.get("params") or {}, date.today().isoformat())
+        except Exception:
+            pass
+        return self._json(200, {"ok": True, "nombre_proyecto": s.get("nombre") or "Proyecto",
+                                "email": email or s.get("email"), "quote": q})
 
     def h_login(self, data):
         email = (data.get("email") or "").strip().lower()

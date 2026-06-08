@@ -120,3 +120,33 @@ as $$
   on conflict (user_id) do update
     set paid_credits = public.quote_limits.paid_credits + excluded.paid_credits;
 $$;
+
+-- ===================================================================
+-- COTIZACIÓN ESPECÍFICA (con DeepSeek)
+-- quote_sessions: borrador en curso. El DRA (MASTER DRA para APPO) vive
+-- AQUÍ, en el servidor — NO se devuelve al cliente (solo el mockup + precio).
+-- ===================================================================
+create table if not exists public.quote_sessions (
+  session_id       uuid primary key default gen_random_uuid(),
+  user_id          uuid references auth.users(id) on delete cascade,
+  nombre_proyecto  text,
+  dra              text,           -- MASTER DRA (oculto al cliente)
+  params           jsonb,          -- parámetros para la rúbrica
+  iter_count       int not null default 0,
+  updated_at       timestamptz not null default now()
+);
+alter table public.quote_sessions enable row level security;
+-- Sin políticas: solo la service_role (backend) la toca.
+
+-- solicitudes: leads finales (cuando el cliente pulsa "Solicitud final").
+create table if not exists public.solicitudes (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid references auth.users(id) on delete set null,
+  email            text,
+  nombre_proyecto  text,
+  dra              text,           -- requerimientos para ustedes / APPO
+  params           jsonb,
+  created_at       timestamptz not null default now()
+);
+alter table public.solicitudes enable row level security;
+-- Sin políticas: solo la service_role (backend) escribe/lee.

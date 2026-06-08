@@ -7,6 +7,17 @@
 
 ---
 
+## ⚡ ACTUALIZACIÓN — dos tipos de cotización (lo más reciente)
+Tras login hay DOS opciones:
+1. **Instantánea** — heurística pura (`config.json`), GRATIS e ILIMITADA. Función `cotizar.js` (sin IA, sin límite).
+2. **Específica** — con **DeepSeek**: genera un mockup HTML (el cliente lo ajusta por chat), un **MASTER DRA** (oculto, vive server-side) y el precio con la **misma rúbrica**. Función `cotizar-especifica.js`. Límite **2/semana** (`consume_quote`, p_free=2) + **pack 10/US$5** (el pack ahora aplica SOLO aquí). "Solicitud final" → `solicitud-final.js` guarda en Supabase `solicitudes` y el cliente dispara un correo de aviso (Netlify Forms `solicitud`).
+
+- **Env nuevas (Netlify):** `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL=deepseek-chat`. (Ya NO se usa Anthropic.)
+- **Tablas nuevas (`schema.sql`):** `quote_sessions` (DRA server-side) y `solicitudes` (leads). Re-corre `schema.sql` (es idempotente).
+- **Frontend:** bandera `ESPECIFICA_ENABLED` en `assets/supabase-config.js`.
+- **Planner Python (APPO):** su prompt ya emite el contrato **MASTER DRA** (carpeta/zip `APPO_Planner_MOD`), modelo `deepseek-chat`.
+- Donde abajo diga "Anthropic / Modo IA", léelo como **DeepSeek / Cotización específica**.
+
 ## 1) Qué es
 
 Web-app de **Ap-Ab** (compañía de software, Bogotá). Es una landing de marca + login + un **cotizador
