@@ -12,3 +12,7 @@ node_modules/
 
 # Datos locales de prueba (backend_local.py)
 .local_data.json
+
+# Python (artefactos)
+__pycache__/
+*.pyc
