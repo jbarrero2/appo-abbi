@@ -1,158 +1,140 @@
-# Ap-Ab — Traspaso para el arquitecto (prompt de integración)
+# Ap-Ab — Traspaso para el arquitecto
 
-> **Para quien integra:** este documento describe TODO lo que ya está construido en la web-app de
-> Ap-Ab y exactamente lo que falta para ponerla en producción ("conectarla a internet"). El código
-> está listo; faltan **cuentas, claves y el cableado del pago**. Sigue las secciones marcadas con ✅ TODO.
-> Puedes pegar este archivo como prompt/brief a tu asistente de código.
+> Web-app de **Ap-Ab** (compañía de software, Bogotá): landing + login + cotizador con DOS modos.
+> Corre en **planes gratuitos** (Netlify + Supabase); el único costo variable es **DeepSeek** (solo en la
+> cotización específica) y la comisión de **Stripe** (solo si venden el pack). El código está listo y
+> probado en local; faltan **cuentas, claves y el despliegue**. Todo lo secreto va en variables de entorno,
+> nunca en el repo. La marca/diseño NO se tocan.
 
 ---
 
-## ⚡ ACTUALIZACIÓN — dos tipos de cotización (lo más reciente)
-Tras login hay DOS opciones:
-1. **Instantánea** — heurística pura (`config.json`), GRATIS e ILIMITADA. Función `cotizar.js` (sin IA, sin límite).
-2. **Específica** — con **DeepSeek**: genera un mockup HTML (el cliente lo ajusta por chat), un **MASTER DRA** (oculto, vive server-side) y el precio con la **misma rúbrica**. Función `cotizar-especifica.js`. Límite **2/semana** (`consume_quote`, p_free=2) + **pack 10/US$5** (el pack ahora aplica SOLO aquí). "Solicitud final" → `solicitud-final.js` guarda en Supabase `solicitudes` y el cliente dispara un correo de aviso (Netlify Forms `solicitud`).
-
-- **Env nuevas (Netlify):** `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL=deepseek-chat`. (Ya NO se usa Anthropic.)
-- **Tablas nuevas (`schema.sql`):** `quote_sessions` (DRA server-side) y `solicitudes` (leads). Re-corre `schema.sql` (es idempotente).
-- **Frontend:** bandera `ESPECIFICA_ENABLED` en `assets/supabase-config.js`.
-- **Planner Python (APPO):** su prompt ya emite el contrato **MASTER DRA** (carpeta/zip `APPO_Planner_MOD`), modelo `deepseek-chat`.
-- Donde abajo diga "Anthropic / Modo IA", léelo como **DeepSeek / Cotización específica**.
-
-## 1) Qué es
-
-Web-app de **Ap-Ab** (compañía de software, Bogotá). Es una landing de marca + login + un **cotizador
-de "cotización rápida"**. Objetivo: confianza y conversión, **al menor costo posible**.
-
-- **Marca (NO cambiar):** fondo `#0a0b08`, texto crema `#f3f0e6`, acentos ember `#ff5b2e` / naranja
-  `#ffab4d` / dorado `#e9c46a`. Fuentes Google: Bricolage Grotesque, Hanken Grotesk, Space Mono.
-  Estética oscura, grilla blueprint, glow ember, botones píldora. Mobile-first y rápida.
-- **Costo:** todo en planes **gratuitos** (Netlify + Supabase). Único costo variable: la API de
-  Anthropic (solo si se usa el Modo IA) y la comisión de Stripe por venta del paquete.
-
-## 2) Stack
-
+## 1) Arquitectura
 | Capa | Servicio | Plan |
 |---|---|---|
 | Hosting + Functions + Forms | **Netlify** | Free |
-| Auth + Postgres | **Supabase** | Free |
-| LLM (extrae parámetros, opcional) | **Anthropic** `claude-haiku-4-5` | pago por uso |
-| Pago del paquete US$5 | **Stripe** (Payment Link + webhook) | comisión por venta |
+| Auth + Postgres | **Supabase** | Free (proyecto ya creado: `tcqnangrmpeboykjtmjo`) |
+| LLM de la específica | **DeepSeek** (`deepseek-chat`, OpenAI-compatible) | pago por uso |
+| Pago del pack US$5 | **Stripe** (Payment Link + webhook) | comisión por venta |
 
-Sin framework ni build: HTML/CSS/JS plano + Supabase JS por CDN. Funciones Node sin dependencias
-(solo `fetch` y `crypto` nativos), empaquetadas por esbuild.
+Sin framework ni build: HTML/CSS/JS plano + Supabase JS por CDN. Funciones Node sin dependencias (solo
+`fetch` y `crypto` nativos), empaquetadas por esbuild.
+
+## 2) Las dos cotizaciones (tras login)
+- **Instantánea** — heurística pura con `config.json`. **Gratis e ILIMITADA**. Sin IA. Función `cotizar.js`.
+- **Específica** — con **DeepSeek**: genera un **mockup HTML** (el cliente lo ajusta por chat), arma un
+  **MASTER DRA** (documento de requerimientos, **oculto al cliente**, vive en `quote_sessions`) y calcula
+  el **precio con la misma rúbrica**. Límite **2/semana + pack de 10 por US$5** (el pack aplica SOLO aquí).
+  Al pulsar **"Solicitud final"** se guarda el lead (DRA + params) en Supabase `solicitudes` y se envía un
+  correo de aviso (Netlify Forms `solicitud`). Funciones `cotizar-especifica.js` y `solicitud-final.js`.
+- **El precio SIEMPRE lo calcula el código** (`lib/pricing.js` + `config.json`), nunca el LLM.
 
 ## 3) Mapa de archivos
-
 ```
-index.html                      Landing (marca + confianza: proceso, garantías, FAQ, portafolio, contacto)
-cotizador.html                  Protegida: login/registro + cotizador + comparador 3 niveles + botón compra
-styles.css                      Marca compartida (edita :root para re-tematizar)
-config.json                     RÚBRICA de precios (editable)
-assets/supabase-config.js       Config PÚBLICA: URL + anon key + AI_MODE_ENABLED + PAYMENT_LINK   ← EDITAR
-assets/cotizador.js             Cliente: auth + llamada a la función + render + botón compra
-netlify/functions/cotizar.js    Backend: valida login + límite (2/sem + créditos) + IA + precio
-netlify/functions/lib/pricing.js  Cálculo determinista (función pura, testeable)
-netlify/functions/stripe-webhook.js  Webhook de pago (SCAFFOLD) → acredita +10
-netlify.toml                    publish="." , functions, included_files=["config.json"]
-schema.sql                      Tabla quote_limits + RLS + función add_quote_credits
-.env.example                    Variables del backend (NO subir el .env real)
-serve.py                        Solo para previsualizar en local (no es del deploy)
+index.html                         Landing (marca + confianza) + form de contacto (Netlify Forms)
+cotizador.html                     Login + selector (instantánea / específica) + mockup + chat
+styles.css                         Marca compartida
+config.json                        RÚBRICA de precios (editable)
+assets/supabase-config.js          PÚBLICO: SUPABASE_URL + ANON_KEY + ESPECIFICA_ENABLED + PAYMENT_LINK
+assets/cotizador.js                Lógica del cotizador (cliente)
+netlify/functions/
+  cotizar.js                       Instantánea (auth + precio determinista, ilimitada)
+  cotizar-especifica.js            Específica (DeepSeek -> mockup + DRA + precio; 2/sem + créditos)
+  solicitud-final.js               Guarda el lead en Supabase 'solicitudes'
+  stripe-webhook.js                Acredita el pack (idempotente + anti-replay)
+  lib/pricing.js                   Cálculo determinista (función pura)
+schema.sql                         Tablas + funciones (correr en Supabase)
+netlify.toml · .env.example · README.md
+backend_local.py · serve.py        Solo pruebas locales (no se despliegan)
 ```
 
-## 4) Cómo funciona el cotizador (reglas de negocio)
-
-- **Sin login no se cotiza.** Auth por email + contraseña (Supabase).
-- **Cotización rápida GRATIS:** **máximo 2 por semana** por usuario (ventana móvil de 7 días).
-- **Paquete de pago:** **10 cotizaciones por US$5** (créditos que **no caducan**). Se consumen
-  después de agotar las 2 gratis de la semana.
-- **Precio:** lo calcula **siempre el código** (`pricing.js` + `config.json`). Modo gratis = selectores.
-  Modo IA (opcional) = el usuario escribe en texto libre y Anthropic **solo extrae parámetros** (JSON);
-  el precio nunca lo decide el LLM.
-- **Comparador (3 niveles, como rango):** mercado (tachado) → Ap-Ab (50%) → **lanzamiento (25%, destacado)**
-  + "ahorras ≈75%" + pago **20% al iniciar / 80% al entregar** + notas fijas.
-- Todo el conteo de límite/créditos se valida en el **servidor** (`quote_limits`); el cliente no puede saltarlo.
-
-### Contrato de la función `POST /.netlify/functions/cotizar`
-```jsonc
-// request
-{ "token": "<supabase access_token>", "mode": "free|ia", "idea": "texto (modo ia)",
-  "tipo": "app_con_backend", "complejidad": "media",
-  "plataformas": ["web"], "addons": ["autenticacion","pagos"], "urgencia": false }
-// 200
-{ "ok": true, "mode": "free", "ai_used": false, "source": "free|paid",
-  "free_per_week": 2, "remaining_free": 1, "remaining_credits": 0, "quote": { /* niveles con min/base/max */ } }
-// 429 (sin cupo)
-{ "error": "rate_limited", "free_per_week": 2, "next_available": "ISO", "days_left": 5, "paid_credits": 0, "can_buy": true }
-// 401 sin/又 token inválido · 500 server_misconfigured/db_error
-```
+## 4) Base de datos (`schema.sql` — idempotente, re-correr es seguro)
+- Tablas: `quote_limits` (cupo 2/sem + créditos), `processed_webhooks` (idempotencia de pagos),
+  `quote_sessions` (DRA server-side de la específica), `solicitudes` (leads finales).
+- Funciones: `consume_quote` (descuenta cupo ATÓMICO, sin carreras), `credit_purchase`
+  (acredita el pack IDEMPOTENTE por `event.id`), `add_quote_credits` (acreditar manual).
 
 ---
 
-## 5) ✅ TODO — Integración (lo que falta para producción)
+## 5) ✅ TODO — Despliegue (lo que falta)
 
 ### A. Supabase
-1. Crear proyecto (Free).
-2. **SQL Editor** → pegar y ejecutar `schema.sql` (crea `quote_limits` + RLS + `add_quote_credits`).
-3. **Authentication → Email**: activado. Para menos fricción, **desactivar "Confirm email"**
-   (si lo dejas activo, el usuario debe confirmar antes de entrar; el frontend ya contempla ambos casos).
-4. **Project Settings → API** → copiar **Project URL**, **anon public** y **service_role** (secreta).
+1. (Ya hay proyecto `tcqnangrmpeboykjtmjo`.) **SQL Editor** → pegar y correr **`schema.sql`** completo.
+2. **Authentication → Email**: activado. Recomendado desactivar "Confirm email" (menos fricción).
+3. **Project Settings → API**: copiar **service_role** (secreta) para Netlify. (La URL + anon ya están en
+   `assets/supabase-config.js`.)
 
-### B. Frontend (`assets/supabase-config.js`)
-- `SUPABASE_URL` y `SUPABASE_ANON_KEY` (públicas).
-- `AI_MODE_ENABLED: true` (debe coincidir con el backend).
-- `PAYMENT_LINK`: el Stripe Payment Link (paso D). Si se deja vacío, el botón abre WhatsApp.
+### B. Netlify — deploy + variables de entorno
+Importar el repo (o arrastrar la carpeta). En **Site → Settings → Environment variables**:
+| Variable | Valor |
+|---|---|
+| `SUPABASE_URL` | `https://tcqnangrmpeboykjtmjo.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | la **service_role** (secreta) |
+| `DEEPSEEK_API_KEY` | la key de DeepSeek (Jerónimo la tiene; **solo backend**) |
+| `DEEPSEEK_MODEL` | `deepseek-chat` |
+| `STRIPE_WEBHOOK_SECRET` | (cuando conecten el pack) `whsec_...` |
+| `PACK_SIZE` | (opcional) `10` |
+Luego: **Deploys → Trigger deploy → Clear cache and deploy**.
 
-### C. Netlify
-1. **Deploy** (arrastrar la carpeta, o conectar repo).
-2. **Environment variables** (Site → Settings → Environment variables): ver `.env.example`
-   - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-   - `AI_MODE_ENABLED=true`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL=claude-haiku-4-5`
-   - (pago) `STRIPE_WEBHOOK_SECRET`, `PACK_SIZE=10`
-3. **Forms → notifications**: enviar el formulario `contacto` a **abbiappo8@gmail.com**.
-4. Redeploy con *Clear cache*.
+### C. Netlify Forms → correo
+Dos formularios llegan a **abbiappo8@gmail.com** (Forms → notifications → Email):
+- `contacto` (formulario de la landing).
+- `solicitud` (aviso de "Solicitud final"; el detalle completo queda en Supabase `solicitudes`).
 
-### D. Pago del paquete (Stripe) — el botón "Comprar 10 · US$5"
-1. Stripe → **Payment Link** de **US$5** (producto "10 cotizaciones rápidas Ap-Ab").
-2. Pegar ese enlace en `PAYMENT_LINK`. El sitio le añade automáticamente
-   `?client_reference_id=<id de usuario logueado>` (y `prefilled_email`).
-3. Stripe → **Developers → Webhooks → Add endpoint**:
-   - URL: `https://TU-SITIO.netlify.app/.netlify/functions/stripe-webhook`
-   - Evento: `checkout.session.completed`
-   - Copiar el **Signing secret** → `STRIPE_WEBHOOK_SECRET` en Netlify.
-4. El webhook (`stripe-webhook.js`) ya: **verifica la firma**, **rechaza réplicas** (tolerancia de
-   tiempo ±5 min) y acredita con `credit_purchase(event.id, user, 10)` — **idempotente**: si Stripe
-   reenvía el mismo evento NO acredita doble (dedupe por `event.id` en la tabla `processed_webhooks`).
-   **Pruébalo en modo test de Stripe** antes de producción.
-> Alternativa más simple sin Stripe: dejar `PAYMENT_LINK` vacío → el botón coordina el pago por
-> WhatsApp y tú acreditas a mano corriendo `select add_quote_credits('<uuid>', 10);` en Supabase.
+### D. Pago del pack (10 específicas · US$5) — Stripe
+1. Crear un **Payment Link** de US$5 y pegarlo en `assets/supabase-config.js` → `PAYMENT_LINK`
+   (el sitio le añade `?client_reference_id=<id de usuario>`).
+2. **Webhook** → `https://TU-SITIO.netlify.app/.netlify/functions/stripe-webhook`, evento
+   `checkout.session.completed`; copiar el signing secret a `STRIPE_WEBHOOK_SECRET`.
+3. `stripe-webhook.js` ya verifica firma, **rechaza réplicas (±5 min)** y acredita con
+   `credit_purchase(event.id, user, 10)` (idempotente: reenvíos NO acreditan doble).
+   Si dejan `PAYMENT_LINK` vacío, el botón coordina el pago por WhatsApp y se acredita a mano:
+   `select add_quote_credits('<uuid>', 10);`
 
-### E. Dominio + correo (opcional)
-- Conectar dominio propio en Netlify (HTTPS automático).
-- Verificar que las notificaciones de Netlify Forms lleguen bien (revisar spam la primera vez).
+### E. Git / dominio
+- Repo: **github.com/jbarrero2/appo-abbi** (commits listos en `main`, falta `git push`).
+- Conectar dominio en Netlify (HTTPS automático).
+
+### F. APPO Planner (pipeline interno, aparte)
+`APPO_Planner_MOD.zip` — servidor Python/FastAPI cuyo prompt ya emite el **contrato MASTER DRA** y usa
+`deepseek-chat`. Es independiente de la web; alimenta a APPO con el plano. Correr: `pip install -r
+requirements.txt`, `DEEPSEEK_API_KEY` en `.env`, `uvicorn main:app`.
 
 ---
 
-## 6) Editar la rúbrica de precios
-Todo en `config.json` (tarifas por tipo, factores de complejidad, add-ons, `urgencia_factor`,
-`vigencia_lanzamiento`, `rango` min/max). La fórmula está documentada en `pricing.js`.
-**Decisiones tomadas (ajustables):** la urgencia (+25%) multiplica el *mercado* para mantener el
-ahorro en ≈75%; "multiplataforma" es un add-on explícito (las plataformas son informativas);
-tras `vigencia_lanzamiento` el lanzamiento pasa solo a 50% automáticamente.
+## 6) Contratos de API (functions)
+```jsonc
+// POST /.netlify/functions/cotizar  (instantánea)
+req:  { token, tipo, complejidad, plataformas[], addons[], urgencia }
+res:  { ok, mode:"instantanea", quote }
 
-## 7) Criterios de aceptación (cumplidos en el código)
-- [x] API key de Anthropic y `service_role` **solo** en el backend (env de Netlify).
-- [x] Límite (2 gratis/semana + créditos) validado en el **servidor**, **atómico** (`consume_quote` con `SELECT … FOR UPDATE`, sin carrera entre pestañas).
-- [x] Webhook de pago **idempotente** (dedupe por `event.id` en `processed_webhooks`) + **anti-replay** (tolerancia ±5 min). El consumo del cupo ya **no es best-effort**: si la BD falla → 500 (no se entrega cotización sin contarla).
-- [x] Sin login no hay cotización real (`?demo=1` es solo vista de diseño).
-- [x] Modo gratis funciona sin ninguna llamada a API.
-- [x] Comparador con 3 niveles + ahorro + pago 20/80, como rango.
-- [x] Formulario de contacto corto (nombre, correo, mensaje) vía Netlify Forms.
-- [x] Secciones de proceso, garantías/por qué confiar, FAQ y contacto real (correo + WhatsApp + Bogotá + 24h).
-- [ ] (TODO integrador) Pago real del paquete US$5 con Stripe en producción.
+// POST /.netlify/functions/cotizar-especifica
+req:  { token, action:"start"|"iterate", text, session_id? }
+res(start):    { ok, session_id, mockup_html, nombre_proyecto, quote, source, remaining_free, remaining_credits, iters_left }
+res(iterate):  { ok, mockup_html, quote, nombre_proyecto, iter_count, iters_left }
+errores: 401 sesión · 429 rate_limited(+can_buy) · 503 especifica_unavailable(falta key) · 502 ai_error
+
+// POST /.netlify/functions/solicitud-final
+req:  { token, session_id }   res: { ok, nombre_proyecto, email, quote }   // guarda en 'solicitudes'
+
+// POST /.netlify/functions/stripe-webhook   (Stripe -> acredita +10, idempotente)
+```
+`quote` = niveles `{base,min,max}` para mercado/apab/lanzamiento/anticipo/saldo/ahorro + `ahorro_pct` + `params`.
+
+## 7) Seguridad (cumplido en el código)
+- `service_role`, `DEEPSEEK_API_KEY`, secretos de Stripe → **solo** en env del backend. La `anon` es pública.
+- `.env` está **gitignored** (no entra al repo). El ZIP de entrega tampoco lo incluye.
+- Límite **atómico** (`consume_quote` con `SELECT … FOR UPDATE`) → sin carreras entre pestañas.
+- Webhook **idempotente** (dedupe por `event.id`) + **anti-replay**.
+- El **MASTER DRA** vive server-side (`quote_sessions`); al cliente solo le llega el mockup + el precio.
+- Sin login no hay cotización; la instantánea es ilimitada, la específica 2/semana + pack.
 
 ## 8) Checklist de prueba post-deploy
-1. Registro + login con un correo de prueba.
-2. Cotizar 2 veces (gratis) → la 3ª debe mostrar el aviso 429 + el botón de compra.
-3. (Si Stripe) pagar en test → el webhook acredita 10 → se puede cotizar de nuevo.
-4. Enviar el formulario de contacto → llega a abbiappo8@gmail.com.
-5. Revisar mobile (mobile-first) y que la marca se vea idéntica.
+1. Registro + login.
+2. **Instantánea**: cambiar opciones → precio inmediato (ilimitado).
+3. **Específica**: describir un proyecto → mockup + precio; ajustar por chat; a la 3ª de la semana → aviso + pack.
+4. **Solicitud final** → llega correo a abbiappo8@gmail.com y queda fila en Supabase `solicitudes`.
+5. (Si Stripe) pagar en test → webhook acredita 10 → vuelve a poder cotizar específicas.
+6. Revisar mobile y que la marca se vea idéntica.
+```text
+Probar la específica en local (dev): poner DEEPSEEK_API_KEY en un .env y abrir "Ap-Ab — Probar.command".
+```
