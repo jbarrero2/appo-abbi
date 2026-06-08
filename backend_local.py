@@ -13,7 +13,7 @@ Uso:   python3 backend_local.py [puerto] [open]
 Límite 2/semana: desactivado por defecto para que pruebes libremente.
 Para probar el límite real, arranca con:  APAB_ENFORCE_LIMIT=1 python3 backend_local.py
 """
-import os, sys, json, http.server, socketserver, functools, hashlib, secrets, webbrowser
+import os, sys, json, re, http.server, socketserver, functools, hashlib, secrets, webbrowser, urllib.request
 from datetime import datetime, timezone, date
 
 DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,6 +43,39 @@ def save_data(d):
 
 def hpw(p):
     return hashlib.sha256(("apab-local::" + p).encode("utf-8")).hexdigest()
+
+
+def supa_cfg():
+    """Lee SUPABASE_URL + anon key de assets/supabase-config.js (si están puestos)."""
+    try:
+        txt = open(os.path.join(DIR, "assets", "supabase-config.js"), "r", encoding="utf-8").read()
+    except Exception:
+        return None
+    mu = re.search(r'SUPABASE_URL:\s*"([^"]+)"', txt)
+    mk = re.search(r'SUPABASE_ANON_KEY:\s*"([^"]+)"', txt)
+    if not mu or not mk:
+        return None
+    url, key = mu.group(1), mk.group(1)
+    if "TU-PROYECTO" in url or "TU_ANON" in key:
+        return None
+    return (url.rstrip("/"), key)
+
+
+def validate_supabase(sc, token):
+    """Valida un JWT de Supabase contra /auth/v1/user. Devuelve el user id o None."""
+    if not sc or not token:
+        return None
+    url, key = sc
+    req = urllib.request.Request(
+        url + "/auth/v1/user",
+        headers={"apikey": key, "Authorization": "Bearer " + token},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=6) as r:
+            obj = json.loads(r.read().decode("utf-8"))
+            return obj.get("id")
+    except Exception:
+        return None
 
 
 # ---------- pricing (igual que netlify/functions/lib/pricing.js) ----------
@@ -147,14 +180,20 @@ class H(http.server.SimpleHTTPRequestHandler):
 
     def h_cotizar(self, data):
         d = load_data()
-        email = d["sessions"].get(data.get("token") or "")
-        if not email or email not in d["users"]:
-            return self._json(401, {"error": "invalid_session"})
+        token = data.get("token") or ""
+        # 1) ¿sesión local?  2) si no, ¿JWT de Supabase válido? (cuando ya lo configuraste)
+        user_key = d["sessions"].get(token)
+        if not (user_key and user_key in d["users"]):
+            uid = validate_supabase(supa_cfg(), token)
+            if uid:
+                user_key = "supa:" + uid
+            else:
+                return self._json(401, {"error": "invalid_session"})
         try:
             cfg = load_cfg()
         except Exception:
             return self._json(500, {"error": "config"})
-        u = d["users"][email]
+        u = d["users"].get(user_key) or {"window_start": None, "free_used": 0, "paid_credits": 0}
         source = "free"
         paid = u.get("paid_credits", 0)
         remaining_free = FREE_PER_WEEK
@@ -189,6 +228,7 @@ class H(http.server.SimpleHTTPRequestHandler):
             u["window_start"] = window_start.isoformat()
             u["free_used"] = free_used
             u["paid_credits"] = paid
+            d["users"][user_key] = u
             save_data(d)
             remaining_free = max(0, FREE_PER_WEEK - free_used)
 
