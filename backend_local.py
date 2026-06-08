@@ -23,6 +23,26 @@ FREE_PER_WEEK = 2
 ENFORCE = os.environ.get("APAB_ENFORCE_LIMIT", "0") == "1"
 
 
+def _load_env():
+    """Carga un .env local (KEY=VALUE) a os.environ para pruebas (DEEPSEEK_API_KEY)."""
+    try:
+        with open(os.path.join(DIR, ".env"), "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k and k not in os.environ:
+                    os.environ[k] = v
+    except Exception:
+        pass
+
+
+_load_env()
+
+
 def load_cfg():
     with open(os.path.join(DIR, "config.json"), "r", encoding="utf-8") as f:
         return json.load(f)
