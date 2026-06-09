@@ -18,6 +18,16 @@
   .team-photo{margin:0 0 48px;border:1px solid var(--line);border-radius:20px;overflow:hidden;position:relative}
   .team-photo img{width:100%;display:block;aspect-ratio:3/2;object-fit:cover;object-position:center}
   .team-photo figcaption{position:absolute;left:0;right:0;bottom:0;padding:18px 22px;font-family:var(--mono);font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--paper);background:linear-gradient(0deg,rgba(10,11,8,.9),rgba(10,11,8,.15) 70%,transparent)}
+  /* redes sociales */
+  .socials{display:flex;align-items:center;gap:12px;margin-top:24px;flex-wrap:wrap}
+  .socials .soc-label{font-family:var(--mono);font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .social{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);border-radius:999px;padding:9px 15px;font-size:.88rem;color:var(--paper);transition:border-color .2s,transform .15s}
+  .social svg{color:var(--ember)}
+  .social:hover{border-color:var(--ember);transform:translateY(-2px)}
+  .social:hover svg{color:var(--ember-2)}
+  .foot-social{display:flex;gap:12px;align-items:center}
+  .foot-social a{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:9px;color:var(--muted);transition:border-color .2s,color .2s}
+  .foot-social a:hover{border-color:var(--ember);color:var(--ember)}
 </style>
 </head>
 <body>
@@ -346,6 +356,17 @@
           </div>
         </div>
         <div class="promise">● Respondemos en menos de 24 horas</div>
+        <div class="socials">
+          <span class="soc-label">Síguenos</span>
+          <a class="social" href="https://www.instagram.com/appoabbi" target="_blank" rel="noopener" aria-label="Instagram de Ap-Ab">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+            Instagram
+          </a>
+          <a class="social" href="https://www.tiktok.com/@appoabbi" target="_blank" rel="noopener" aria-label="TikTok de Ap-Ab">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.5 3c.4 2.1 1.9 3.7 4 4v2.8c-1.4 0-2.8-.4-4-1.1v6.1c0 3.1-2.5 5.6-5.6 5.6S5.3 17.9 5.3 14.8s2.5-5.6 5.6-5.6c.3 0 .7 0 1 .1v2.9c-.3-.1-.7-.2-1-.2-1.5 0-2.8 1.2-2.8 2.8s1.2 2.8 2.8 2.8 2.8-1.2 2.8-2.8V3h2.5z"/></svg>
+            TikTok
+          </a>
+        </div>
       </div>
 
       <!--
@@ -384,6 +405,14 @@
       <div class="brand"><span class="mk" style="display:inline-grid;width:24px;height:24px;border-radius:6px;place-items:center;font-family:var(--display);font-weight:800;font-size:.65rem;color:#180802;background:linear-gradient(135deg,var(--ember),var(--ember-2))">A·A</span> Ap-Ab</div>
       <div>© <span id="year"></span> Ap-Ab. Hecho en Bogotá, Colombia.</div>
       <div><a href="mailto:abbiappo8@gmail.com" style="color:var(--ember)">abbiappo8@gmail.com</a></div>
+      <div class="foot-social">
+        <a href="https://www.instagram.com/appoabbi" target="_blank" rel="noopener" aria-label="Instagram de Ap-Ab">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+        </a>
+        <a href="https://www.tiktok.com/@appoabbi" target="_blank" rel="noopener" aria-label="TikTok de Ap-Ab">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.5 3c.4 2.1 1.9 3.7 4 4v2.8c-1.4 0-2.8-.4-4-1.1v6.1c0 3.1-2.5 5.6-5.6 5.6S5.3 17.9 5.3 14.8s2.5-5.6 5.6-5.6c.3 0 .7 0 1 .1v2.9c-.3-.1-.7-.2-1-.2-1.5 0-2.8 1.2-2.8 2.8s1.2 2.8 2.8 2.8 2.8-1.2 2.8-2.8V3h2.5z"/></svg>
+        </a>
+      </div>
     </div>
   </div>
 </footer>
